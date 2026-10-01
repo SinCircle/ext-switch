@@ -1,0 +1,345 @@
+/* 扩展开关 —— 面板样式
+ *
+ * 视觉方向：单色的精密感。
+ * 开关不用蓝/绿，亮色模式「开」是墨黑、深色模式反相成近白；唯一的颜色留给
+ * 焦点环和错误提示。这样整块面板几乎没有色噪，扫一眼就能看出哪几个是开着的
+ * （开着的行文字是正常墨色，关掉的行文字压暗一档）。
+ * 字体用系统 UI 栈而不是打包 web font：popup 每次打开都要等字体文件，不值。
+ */
+
+:root {
+  --bg:        #fbfbfa;
+  --fg:        #1b1b1a;
+  --fg-dim:    #6c6c69;   /* 关掉的扩展名 */
+  --fg-faint:  #a3a39f;
+  --line:      #e9e9e6;
+  --hover:     #f1f1ee;
+  --track-off: #dbdbd7;
+  --track-on:  #1b1b1a;
+  --knob-off:  #ffffff;
+  --knob-on:   #ffffff;
+  --tile:      #ececea;
+  --focus:     #2f6af0;
+  --danger:    #b4232a;
+  --fly:       rgba(0, 0, 0, .16);   /* 弹出菜单的投影 */
+  --lift:      rgba(0, 0, 0, .14);   /* 被拎起来那一行的投影（写在动画关键帧里用） */
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg:        #1c1c1e;
+    --fg:        #ededeb;
+    --fg-dim:    #8d8d8b;
+    --fg-faint:  #5c5c5a;
+    --line:      #2e2e31;
+    --hover:     #29292c;
+    --track-off: #3d3d41;
+    --track-on:  #ededeb;
+    --knob-off:  #8d8d8b;
+    --knob-on:   #1c1c1e;
+    --tile:      #2a2a2d;
+    --focus:     #7aa2ff;
+    --danger:    #ff8b8b;
+    --fly:       rgba(0, 0, 0, .6);
+    --lift:      rgba(0, 0, 0, .55);
+  }
+}
+
+* { box-sizing: border-box; }
+
+/* 必须显式写：.row 是 display:flex、#clear 是 display:grid，
+   作者样式表压得过 UA 的 [hidden]{display:none}，不加这条 hidden 会失效。 */
+[hidden] { display: none !important; }
+
+body {
+  width: 300px;
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 13px/1.45 "Segoe UI Variable Text", "Segoe UI", system-ui,
+        "Microsoft YaHei UI", "PingFang SC", sans-serif;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* ── 搜索栏 ─────────────────────────────────────────────── */
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 40px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.glyph {
+  flex: none;
+  width: 13px;
+  height: 13px;
+  color: var(--fg-faint);
+}
+
+#q {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  -webkit-user-select: text;
+  user-select: text;
+}
+#q::placeholder { color: var(--fg-faint); }
+#q:focus { outline: none; }
+
+#clear {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--track-off);
+  color: var(--bg);
+  cursor: pointer;
+}
+#clear svg { width: 12px; height: 12px; }
+#clear:hover { background: var(--fg-dim); }
+
+/* ── 列表 ───────────────────────────────────────────────── */
+
+.list {
+  max-height: 480px;
+  margin: 0;
+  padding: 5px 6px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  list-style: none;
+}
+
+.list::-webkit-scrollbar { width: 8px; }
+.list::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 4px;
+  background: var(--track-off);
+  background-clip: padding-box;
+}
+.list::-webkit-scrollbar-thumb:hover { background-clip: padding-box; background-color: var(--fg-faint); }
+.list::-webkit-scrollbar-track { background: none; }
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  height: 38px;
+  padding: 0 7px;
+  border-radius: 7px;
+  cursor: pointer;   /* 整行可点（不用瞄准那个 30px 的开关），光标要如实这么说 */
+}
+.row:hover { background: var(--hover); }
+
+/* 被拎起来的那一行：抬到最上层，底色换成悬停色——不换的话它从邻居的文字上面碾过去时
+   两行字会叠在一起糊成一片。影子和放大都写在动画的关键帧里（要跟着"浮起来 / 降下去"
+   一起收放），这里只管底和层级。
+   让位的那几行什么都不加：一层层带着影子的卡片摞在一起、还互相盖来盖去，看着一团乱，
+   反而分不清刚动的到底是哪一个。 */
+.row.lifted {
+  position: relative;
+  z-index: 1;
+  background: var(--hover);
+}
+
+/* 图标：优先用扩展自己的图标；加载不到（别的扩展没把资源声明成 web_accessible）
+   就退回字符瓦片。瓦片底色按名字哈希取一个低饱和色，只为好扫，不抢眼。 */
+.fav,
+.tile {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+}
+.fav { object-fit: contain; }
+
+.tile {
+  display: grid;
+  place-items: center;
+  background: var(--tile);
+  color: var(--fg-dim);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+/* 关掉的扩展名压暗一档：整列扫下来，亮着的就是开着的 */
+.row[data-on="0"] .name { color: var(--fg-dim); }
+
+/* ── 开关 ───────────────────────────────────────────────── */
+
+.sw {
+  flex: none;
+  position: relative;
+  width: 30px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 9px;
+  background: var(--track-off);
+  cursor: pointer;
+  transition: background 140ms ease;
+}
+.sw::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--knob-off);
+  transition: transform 140ms cubic-bezier(.32, .72, 0, 1), background 140ms ease;
+}
+.row[data-on="1"] .sw { background: var(--track-on); }
+.row[data-on="1"] .sw::after {
+  background: var(--knob-on);
+  transform: translateX(12px);
+}
+
+.sw:active::after { width: 17px; }
+.row[data-on="1"] .sw:active::after { transform: translateX(9px); }
+
+/* ── 空态 / 备注 ────────────────────────────────────────── */
+
+.empty {
+  margin: 0;
+  padding: 26px 12px;
+  color: var(--fg-faint);
+  text-align: center;
+}
+
+.note {
+  margin: 0;
+  padding: 3px 13px 7px;
+  color: var(--fg-faint);
+  font-size: 11px;
+}
+
+/* ── 底部 ───────────────────────────────────────────────── */
+
+.foot {
+  position: relative;   /* 排序菜单绝对定位就挂在这上面 */
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 2px;
+  padding: 5px 6px;
+  border-top: 1px solid var(--line);
+}
+
+.foot button {
+  height: 28px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--fg-dim);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.foot button:hover:not(:disabled) { background: var(--hover); color: var(--fg); }
+.foot button:disabled { color: var(--fg-faint); cursor: default; opacity: .5; }
+#sort[aria-expanded="true"] { background: var(--hover); color: var(--fg); }
+
+/* ── 排序菜单 ───────────────────────────────────────────── */
+
+.menu {
+  position: absolute;
+  right: 6px;
+  bottom: calc(100% + 4px);
+  z-index: 5;
+  min-width: 152px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  box-shadow: 0 6px 18px var(--fly);
+}
+
+.menu button {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  height: 28px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  color: var(--fg-dim);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+.menu button:hover { background: var(--hover); color: var(--fg); }
+.menu button[aria-checked="true"] { color: var(--fg); }
+
+/* 打勾用两条边框转 45° 画出来，不用 ✓ 这个字符：字形在系统字体里不一定有，
+   缺了就是白方块，而且缺字形不会有任何报错。 */
+.tick {
+  flex: none;
+  position: relative;
+  width: 11px;
+  height: 11px;
+}
+.menu button[aria-checked="true"] .tick::after {
+  content: "";
+  position: absolute;
+  left: 1.5px;
+  top: 0.5px;
+  width: 4.5px;
+  height: 8.5px;
+  border: solid currentColor;
+  border-width: 0 1.6px 1.6px 0;
+  transform: rotate(45deg);
+}
+
+/* ── 焦点 / 提示 ────────────────────────────────────────── */
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+
+.toast {
+  position: fixed;
+  right: 12px;
+  bottom: 44px;
+  left: 12px;
+  margin: 0;
+  padding: 8px 11px;
+  border-radius: 7px;
+  background: var(--fg);
+  color: var(--bg);
+  font-size: 12px;
+  text-align: center;
+  animation: rise 160ms ease;
+}
+.toast[data-kind="err"] { background: var(--danger); color: #fff; }
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(4px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}

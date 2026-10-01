@@ -1,0 +1,6 @@
+# 跑脚本和测试时生成的，不必进版本库
+test/fixtures/
+test/fixtures-many/
+test/_*.png
+icons/_sheet.png
+out.png
