@@ -7,8 +7,6 @@ undo, three sort modes.*
 
 Chrome / Edge 通用，Manifest V3，权限只有 `management` 和 `storage`。
 
-![面板](docs/screenshot.png)
-
 浏览器的扩展管理页要开标签页、滚动、点两下才到位。而"临时关掉某几个扩展"是高频动作：
 排查冲突、看视频时关掉广告拦截、跑测试时关掉脚本注入。这个面板就是为这件事做的。
 
@@ -34,8 +32,6 @@ Chrome / Edge 通用，Manifest V3，权限只有 `management` 和 `storage`。
 
 点开关时那一行会**浮起来、飞过去、落回**新位置，一共 400ms；被挤动的行同时滑过去让位。
 系统开了「减少动态效果」就不播动画，直接到位。
-
-![排序菜单](docs/screenshot-sort.png)
 
 排序方式记在 `storage.local`，关掉面板、重启浏览器都还在。
 
