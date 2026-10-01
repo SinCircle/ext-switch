@@ -30,8 +30,11 @@ FIXTURES = {
     "long-name": {"name": "网页深色模式与护眼滤镜自动切换工具", "icon": False},
 }
 
+# 填充用的名字取得像真装的，列表长起来才像回事（截图尤其）。
+# 一条注意：别用 Chrome 会从注册表自动装进每个新 profile 的那些外部扩展（本机实测是
+# IDM Integration Module）——那会让列表里同名出现两次，截图看着像坏了。
 FILLER = [
-    "Tampermonkey", "IDM Integration Module", "AdGuard 广告拦截", "Dark Reader",
+    "Tampermonkey", "OneTab", "AdGuard 广告拦截", "Dark Reader",
     "Bitwarden", "Save to Notion", "沉浸式翻译", "Wappalyzer",
     "JSON Viewer Pro", "屏幕截图与标注",
 ]
