@@ -493,7 +493,7 @@ const DUMP = `(async () => {
     sort: (document.querySelector('#sort-menu [aria-checked="true"]') || {}).dataset?.mode || '',
     toast: document.getElementById('toast').hidden
       ? '' : document.getElementById('toast').textContent,
-    // 右键的动作菜单：开着没、列了哪几项、冲着哪一行、落在哪儿（贴边收拢有没有生效）
+    // 右键的动作菜单：开着没、列了哪几项、冲着哪一行、落在哪儿（翻方向/收边有没有生效）
     rowMenu: {
       open: !document.getElementById('row-menu').hidden,
       items: [...document.querySelectorAll('#row-menu button')].map((b) => b.textContent),

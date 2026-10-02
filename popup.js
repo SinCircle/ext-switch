@@ -503,15 +503,27 @@ function buildRowMenu(it) {
   el.rowMenu.replaceChildren(frag);
 }
 
-/* 贴光标摆，并且贴着面板边缘收拢：右边放不下往左挪，下边放不下往上弹。不收的话，
- * 靠底那几行的菜单会有一半伸到面板外面——面板只有 300 宽、几行高，这不是边角情况。 */
+/* 贴光标摆。先试四个方向——右下、右上、左下、左上——挑第一个整块装得下的；实在都装不下
+ * 才收边（菜单比面板还宽或还高，正常不会）。先定水平再定竖直，所以偏好顺序就是文案里
+ * 那个：菜单一贯"先往右下弹，下面不够才翻上去"。
+ *
+ * 每个方向都跟光标留一道缝（GAP）。菜单盖在光标底下的话，下一次点——不管是想点某一项，
+ * 还是想点空处把它收起来——落点就已经在菜单里了，很容易点错。先前是"贴边收拢"，右键
+ * 行的右半边会撞到右边、被往左推，结果菜单正好压在光标上（实测：在 x=272 右键，菜单
+ * 落在 174..294）。 */
 function placeRowMenu(x, y) {
   const r = el.rowMenu.getBoundingClientRect();
-  const pad = 6;
+  const pad = 6;         // 跟面板边缘留的缝
+  const gap = 4;         // 跟光标留的缝
   const vw = document.documentElement.clientWidth;
   const vh = document.documentElement.clientHeight;
-  el.rowMenu.style.left = Math.max(pad, Math.min(x, vw - r.width - pad)) + 'px';
-  el.rowMenu.style.top = Math.max(pad, Math.min(y, vh - r.height - pad)) + 'px';
+
+  const left = x + gap + r.width <= vw - pad ? x + gap : x - gap - r.width;
+  const top = y + gap + r.height <= vh - pad ? y + gap : y - gap - r.height;
+
+  // 两边都放不下才收边。真收上了光标可能落进菜单里——面板一共 300 宽，手段只有这些。
+  el.rowMenu.style.left = Math.max(pad, Math.min(left, vw - r.width - pad)) + 'px';
+  el.rowMenu.style.top = Math.max(pad, Math.min(top, vh - r.height - pad)) + 'px';
 }
 
 function openRowMenu(it, x, y) {

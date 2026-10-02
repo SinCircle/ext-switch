@@ -85,6 +85,15 @@ function animProblems(pr) {
 /** 有几行被"拎起来"（第一帧带 scale）——按要求只该有用户点的那一个。 */
 const lifted = (pr) => pr.anims.filter((a) => a.tops).length;
 
+/* 那个点（右键的坐标，或者键盘那条路用的锚点）离菜单矩形最近的距离，落在矩形里面算 0。
+ * 菜单必须**不盖住**它：盖住了的话，下一次点——不管是想点某一项还是想点空处把菜单收起来
+ * ——落点就已经在菜单里了。 */
+function distTo(rect, p) {
+  const dx = Math.max(rect.left - p.x, 0, p.x - (rect.left + rect.w));
+  const dy = Math.max(rect.top - p.y, 0, p.y - (rect.top + rect.h));
+  return Math.round(Math.hypot(dx, dy));
+}
+
 const ok = (cond, msg) => (cond ? [] : [msg]);
 
 /* 面板只在打开那一刻读一次列表，而 Chrome 会把注册表里声明的"外部扩展"（本机是 IDM）
@@ -396,9 +405,12 @@ const CASES = [
           && rm.rect.left + rm.rect.w <= after.viewport.w
           && rm.rect.top + rm.rect.h <= after.viewport.h,
           `菜单该整块落在面板里（面板 ${after.viewport.w}×${after.viewport.h}），实际 ${JSON.stringify(rm.rect)}`),
-        // 菜单够窄的话，就不用往左跳——正落在光标上（面板一共才 300 宽，宽了必然要挪）
-        ...ok(!!rm.rect && Math.abs(rm.rect.left - rcs[0].x) <= 2,
-          `菜单该正落在光标上（右键在 x=${rcs[0].x}，菜单左边缘 ${rm.rect.left}）`),
+        // 菜单跟光标留一道缝：既不许盖住它（盖住了下一次点就点在菜单上），也不许跑太远
+        // ——右半边那两处靠的是"往另一侧弹"，不是"整块缩到面板里"（见下面两条场景）
+        ...ok(!!rm.rect && distTo(rm.rect, rcs[0]) > 0,
+          `菜单不该盖住光标（右键在 ${rcs[0].x},${rcs[0].y}，菜单 ${JSON.stringify(rm.rect)}）`),
+        ...ok(!!rm.rect && distTo(rm.rect, rcs[0]) <= 8,
+          `菜单该紧挨着光标，实际隔了 ${rm.rect ? distTo(rm.rect, rcs[0]) : '?'}px`),
         // 鼠标右键弹出来的菜单不该顶着焦点环（虽然焦点确实挪进了菜单，方向键要用）
         ...ok(after.activeOutline === 'none',
           `鼠标右键弹的菜单不该有焦点环，实际 "${after.activeOutline}"`),
@@ -570,28 +582,74 @@ const CASES = [
         ...ok(dumps[1].activeOutline !== 'none',
           `键盘唤起的菜单该画出焦点环，实际 "${dumps[1].activeOutline}"`),
         ...ok(zero.menuTop !== null, '没有坐标的那次也该开出菜单'),
-        ...ok(Math.abs(zero.menuTop - (zero.rowTop + 8)) <= 2,
-          `没有坐标时该贴着那一行弹（行顶 ${zero.rowTop}，菜单顶 ${zero.menuTop}）`),
+        // 锚点是"行顶 + 8"，菜单再隔一道缝落到它下面（缝见 popup.js 里的 gap）
+        ...ok(zero.menuTop > zero.rowTop + 8 && zero.menuTop <= zero.rowTop + 16,
+          `没有坐标时该贴着那一行弹、又不压住锚点（行顶 ${zero.rowTop}，菜单顶 ${zero.menuTop}）`),
         ...ok(zero.menuLeft > 0, `没有坐标时不该缩到面板左上角（菜单左侧 ${zero.menuLeft}）`),
         ...ok(dumps[2].mismatched === 0, `${dumps[2].mismatched} 行不一致`),
       ];
     },
   },
   {
-    // 面板只有 300 宽、几行高（4 个扩展时整块约 235 高），靠底那一行的菜单不收边就会
-    // 有一截伸到面板外面。把视口设成 250 高（贴着真面板的尺寸），右键最下面那一行。
-    // 判据是"收进来了，而且是贴着下边缘停住"——不收的话菜单底会到 281，超出面板。
-    name: '右键靠底那一行：菜单贴着面板下边缘往上收，不伸到外面',
+    // 面板只有 300 宽、几行高（4 个扩展时整块约 235 高）。把视口设成 250 高（贴着真面板
+    // 的尺寸），右键最下面那一行：下面装不下，菜单该整个翻到光标**上面**去——而不是留在
+    // 下面往面板里收。旧写法就是收边，实测菜单顶 141、光标 y=178，菜单正好把光标罩住。
+    name: '右键靠底那一行：菜单翻到光标上面，不压住光标也不伸到面板外面',
     args: ['--fixtures', '--dump', '--height', '250', '--right-click', `name=${BETA}`],
-    check([, after]) {
+    check([, after], probes, targets, keys, rcs) {
       const r = after.rowMenu.rect;
       const vp = after.viewport;
       return [
         ...ok(after.rowMenu.open === true, '菜单该开着'),
         ...ok(!!r && r.top >= 0 && r.left >= 0 && r.left + r.w <= vp.w && r.top + r.h <= vp.h,
           `菜单该整块落在面板里（面板 ${vp.w}×${vp.h}），实际 ${JSON.stringify(r)}`),
-        ...ok(!!r && r.top + r.h > vp.h - 20,
-          `收进来之后该贴着下边缘，而不是缩到上半截去，实际 ${JSON.stringify(r)}`),
+        ...ok(!!r && r.top + r.h < rcs[0].y,
+          `下面装不下就该整个翻到光标上面（光标 y=${rcs[0].y}，菜单 ${JSON.stringify(r)}）`),
+        ...ok(!!r && distTo(r, rcs[0]) > 0,
+          `菜单不该盖住光标（右键在 ${rcs[0].x},${rcs[0].y}，菜单 ${JSON.stringify(r)}）`),
+      ];
+    },
+  },
+  {
+    // 行的右半边（开关那儿，x≈272）右键：右边放不下，菜单该整个翻到光标**左边**去。
+    // 旧写法是往左挪一截、贴着右边缘停下（实测菜单落在 174..294），于是光标正好压在
+    // 菜单里——右键之后鼠标就站在菜单上了。
+    name: '右键行的右半边：菜单翻到光标左边，不压住光标',
+    args: ['--fixtures', '--dump', '--right-click', `row=${ALPHA}`],
+    check([, after], probes, targets, keys, rcs) {
+      const r = after.rowMenu.rect;
+      const vp = after.viewport;
+      return [
+        ...ok(after.rowMenu.open === true, '菜单该开着'),
+        ...ok(!!r && r.left >= 0 && r.top >= 0 && r.left + r.w <= vp.w && r.top + r.h <= vp.h,
+          `菜单该整块落在面板里（面板 ${vp.w}×${vp.h}），实际 ${JSON.stringify(r)}`),
+        ...ok(!!r && r.left + r.w < rcs[0].x,
+          `右边装不下就该整个翻到光标左边（光标 x=${rcs[0].x}，菜单 ${JSON.stringify(r)}）`),
+        ...ok(!!r && distTo(r, rcs[0]) > 0,
+          `菜单不该盖住光标（右键在 ${rcs[0].x},${rcs[0].y}，菜单 ${JSON.stringify(r)}）`),
+        ...ok(JSON.stringify(after.rowMenu.items) === JSON.stringify(
+          ['打开详情页', '打开选项页', '打开主页', '复制扩展 ID', '卸载']),
+          `在开关上右键也该是这一行的菜单：${JSON.stringify(after.rowMenu.items)}`),
+        ...ok(after.mismatched === 0, `${after.mismatched} 行不一致`),
+      ];
+    },
+  },
+  {
+    // 极端的那个方向：面板比菜单还矮（这里 145 高，五项菜单 159 高），四个方向都装不下。
+    // 这时只剩"收边"一条路，菜单会被窗口下沿切掉一截——**这条代价认了**：右键之后鼠标
+    // 不能站在菜单上，比"菜单完整"更要紧（鼠标在菜单里，下一次点就先点在菜单上了）。
+    // 所以这条只断言"不压住光标"，菜单是不是整块可见不管——将来真给它加滚动条也不会
+    // 把这条断言弄红。
+    name: '面板比菜单还矮时：宁可被窗口切掉一截，也不让菜单压住光标',
+    args: ['--fixtures', '--dump', '--height', '160', '--right-click', `name=${ALPHA}`],
+    check([, after], probes, targets, keys, rcs) {
+      const r = after.rowMenu.rect;
+      return [
+        ...ok(after.rowMenu.open === true, '菜单该开着'),
+        ...ok(!!r && r.left >= 0 && r.top >= 0,
+          `菜单该从面板里开始画，实际 ${JSON.stringify(r)}`),
+        ...ok(!!r && distTo(r, rcs[0]) > 0,
+          `菜单不该盖住光标（右键在 ${rcs[0].x},${rcs[0].y}，菜单 ${JSON.stringify(r)}）`),
       ];
     },
   },
