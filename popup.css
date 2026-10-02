@@ -313,9 +313,42 @@ body {
   transform: rotate(45deg);
 }
 
+/* ── 行的动作菜单 ───────────────────────────────────────── */
+
+/* .menu 的那套定位是给底栏「排序」摆的（贴在底栏上方、右对齐）；行菜单要贴光标，
+   位置全由 JS 算（碰到面板边缘还得往回收——面板就是那个窗口，网页画不到窗外去），
+   所以把那三条定位取消，只留外观。
+   宽度收窄到刚好装下最长的那个标签（「在应用商店中打开」8 个字）：菜单窄了，
+   才能正落在光标上而不必往左跳——面板一共才 300 宽，168 太占地。 */
+.ctx {
+  position: fixed;
+  right: auto;
+  bottom: auto;
+  min-width: 120px;
+}
+
+.ctx .sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--line);
+}
+
+/* 菜单冲着哪一行弹：那一行垫个底色。几个菜单项浮在列表上，不标一下看不出管的是谁。 */
+.row.acting { background: var(--hover); }
+
 /* ── 焦点 / 提示 ────────────────────────────────────────── */
 
 :focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+
+/* 菜单项的焦点环只在"最近一次用的是键盘"时才画。鼠标右键弹出来的菜单不该顶着一圈蓝框
+   ——可光靠 :focus-visible 拦不住：面板一打开是脚本把焦点给搜索框的，那一下浏览器记成
+   "键盘焦点"，接着脚本把焦点给菜单项时会把这个状态继承下去，于是右键也画出蓝框（实测）。
+   所以自己按最后一次输入方式给根元素挂 .kbd（在 popup.js 里），这里只看它。 */
+.menu button:focus-visible { outline: none; }
+.kbd .menu button:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 1px;
 }

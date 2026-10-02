@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "扩展开关",
-  "version": "1.0.0",
-  "description": "点一下工具栏图标，快速开关其他扩展。",
+  "version": "1.1.0",
+  "description": "点一下工具栏图标，快速开关其他扩展。右键某一项还能打开它的详情页、选项页，或复制 ID、卸载。",
   "homepage_url": "https://github.com/SinCircle/ext-switch",
   "permissions": ["management", "storage"],
   "action": {

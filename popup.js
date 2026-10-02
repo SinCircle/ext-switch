@@ -14,6 +14,9 @@
  * 另外两份存在 storage.local 的偏好（跟面板同寿不如跟浏览器同寿）：
  *   sort    排序方式，见 SORTS
  *   recent  每个扩展「上次被面板打开」的时刻，给「最近开启的排前面」用
+ *
+ * 面板上有两处菜单：底栏「排序」，和右键某一行的动作菜单。它们共用同一套「只开一个、
+ * 点外面那一下吃掉、方向键在项之间走」的处理，见下面「菜单」那一节。
  */
 'use strict';
 
@@ -60,9 +63,10 @@ const el = {
   undo: document.getElementById('undo'),
   sort: document.getElementById('sort'),
   menu: document.getElementById('sort-menu'),
+  rowMenu: document.getElementById('row-menu'),
 };
 
-/** @type {{id:string,name:string,on:boolean,onAt?:number,icon:string|null,row:HTMLElement,sw:HTMLElement}[]} */
+/** @type {{id:string,name:string,on:boolean,onAt?:number,icon:string|null,optionsUrl:string,homepageUrl:string,fromStore:boolean,row:HTMLElement,sw:HTMLElement}[]} */
 const items = [];
 const byId = new Map();
 
@@ -83,7 +87,14 @@ async function readExtensions() {
   for (const e of all) {
     if (e.type !== 'extension' || e.id === SELF_ID) continue;
     if (!e.mayDisable) { locked++; continue; }
-    mine.push({ id: e.id, name: e.name || e.id, on: e.enabled, icon: pickIcon(e.icons) });
+    mine.push({
+      id: e.id, name: e.name || e.id, on: e.enabled, icon: pickIcon(e.icons),
+      // 下面这三样只有右键菜单用得上：有没有选项页/主页，是不是商店装的
+      // （商店那条链接对开发方式装的扩展是个 404 页面，所以那种情形干脆不给这一项）
+      optionsUrl: e.optionsUrl || '',
+      homepageUrl: e.homepageUrl || '',
+      fromStore: e.installType === 'normal',
+    });
   }
   return { mine, locked };   // 不在这儿排：排序方式是可配的，交给 resort()
 }
@@ -142,7 +153,9 @@ function buildRow(it) {
 
   /* 点击挂在整行上，不挂在开关上：开关只有 30×18，整行是 288×38；
    * 后者不用瞄准，快得多。开关自己的点击冒泡上来也走这一条，所以不会翻两次。
-   * 键盘操作照旧——<button> 拿到回车/空格后触发的 click 也从这里走。 */
+   * 键盘操作照旧——<button> 拿到回车/空格后触发的 click 也从这里走。
+   * 菜单开着的时候这一行收不到 click：「点菜单外面只关菜单」那条监听挂在捕获阶段，
+   * 会把这一下吃掉（所以点被右键的那一行也只是收起菜单，不会顺手把开关翻了）。 */
   li.addEventListener('click', () => toggle(it));
 
   li.append(makeIcon(it), Object.assign(document.createElement('span'),
@@ -325,6 +338,38 @@ async function undo() {
   toast(failed ? `已撤销，${failed} 个失败` : '已撤销', failed ? 'err' : '');
 }
 
+/* 复制扩展 ID。写剪贴板不用额外申请权限（实测），但要求文档有焦点——面板开着的时候
+ * 本来就有，所以这条只在"面板根本没在前台"这种不该发生的状态下会失败。 */
+async function copyId(it) {
+  try {
+    await navigator.clipboard.writeText(it.id);
+    toast(`已复制「${it.name}」的扩展 ID`);
+  } catch (err) {
+    toast('复制失败：' + err.message, 'err');
+  }
+}
+
+/* 卸载。Chrome 卸「别的扩展」时一定会弹它自己的确认框——官方文档写明这种情形下
+ * showConfirmDialog 参数被忽略（实测：传 false 也照样弹，探针就挂在那儿不动）。
+ * 所以这里不再自己加一道确认，也不去设那个参数。
+ * 用户点取消时 promise 会 reject：扩展还在、面板也什么都没改，就静静地不做声——
+ * 他刚亲手点了取消，再弹一句"没卸载"是废话。 */
+async function uninstall(it) {
+  try {
+    await chrome.management.uninstall(it.id);
+  } catch {
+    return;
+  }
+  it.row.remove();
+  items.splice(items.indexOf(it), 1);
+  byId.delete(it.id);
+  delete recent[it.id];      // 「最近开启」那张表里也把它清掉，不然只涨不消
+  await saveRecent();
+  el.allOff.disabled = el.allOn.disabled = !items.length;
+  filter();                  // 空面板文案、计数都归它管
+  toast(`已卸载「${it.name}」`);
+}
+
 // ── 过滤 / 提示 ────────────────────────────────────────────────────
 
 function filter() {
@@ -359,24 +404,55 @@ function toast(msg, kind = '') {
   toastTimer = setTimeout(() => { el.toast.hidden = true; }, 2600);
 }
 
-// ── 排序菜单 ───────────────────────────────────────────────────────
+// ── 菜单（底栏「排序」和右键的动作菜单共用）─────────────────────────
 
-const menuItems = [...el.menu.querySelectorAll('[data-mode]')];
-const menuOpen = () => !el.menu.hidden;
+/* 两个菜单要做的是同一件事：同一时刻只开一个、点外面那一下要吃掉、方向键在项之间走。
+ * 所以「现在哪个菜单开着」只有这一处状态，事件处理也只有这一份——不把排序菜单那套
+ * 照抄一遍。 */
+let openMenuEl = null;    // 现在开着的是哪个 <div class="menu">
+let menuOwner = null;     // 开它的那个元素：底栏「排序」按钮，或者被右键的那一行
 
-function paintSort() {
-  for (const b of menuItems) b.setAttribute('aria-checked', String(b.dataset.mode === sortId));
+/* 最近一次用的是键盘还是鼠标，挂在根元素的 .kbd 上，CSS 拿它决定菜单项画不画焦点环
+ * （见 popup.css 那段注释：光靠 :focus-visible 会把鼠标弹的菜单也画上蓝框）。
+ * 右键一定先过 mousedown、Shift+F10 一定先过 keydown，所以这两个事件足够分辨。 */
+document.addEventListener('keydown', () => document.documentElement.classList.add('kbd'), true);
+document.addEventListener('mousedown', () => document.documentElement.classList.remove('kbd'), true);
+
+function showMenu(node, owner, first) {
+  // 已经开着、而且是冲着同一个元素弹的，就不用重来一遍
+  if (openMenuEl === node && menuOwner === owner) return;
+  hideMenu(false);       // 换一个开（另一个菜单，或者同一份菜单换一行）：焦点马上要给
+  node.hidden = false;   // 新菜单，不必先还回去
+  openMenuEl = node;
+  menuOwner = owner;
+  if (owner.hasAttribute('aria-expanded')) owner.setAttribute('aria-expanded', 'true');
+  (first || node.querySelector('button')).focus();
 }
 
-function showMenu(open) {
-  el.menu.hidden = !open;
-  el.sort.setAttribute('aria-expanded', String(open));
-  if (open) (menuItems.find((b) => b.dataset.mode === sortId) || menuItems[0]).focus();
+function hideMenu(refocus = true) {
+  if (!openMenuEl) return;
+  const owner = menuOwner;
+  const wasRowMenu = openMenuEl === el.rowMenu;
+  openMenuEl.hidden = true;
+  openMenuEl = null;
+  menuOwner = null;
+  if (owner.hasAttribute('aria-expanded')) owner.setAttribute('aria-expanded', 'false');
+  if (wasRowMenu) el.list.querySelector('.row.acting')?.classList.remove('acting');
+  // 焦点还给 owner 里的那个按钮：行要还给它右边的开关（行本身不可聚焦），排序按钮
+  // 还给它自己（它里面没有别的按钮，querySelector 落空就退回它本身）。
+  if (refocus) (owner.querySelector('button') || owner).focus();
+}
+
+// ── 底栏「排序」菜单 ───────────────────────────────────────────────
+
+const sortItems = [...el.menu.querySelectorAll('[data-mode]')];
+
+function paintSort() {
+  for (const b of sortItems) b.setAttribute('aria-checked', String(b.dataset.mode === sortId));
 }
 
 async function pickSort(mode) {
-  showMenu(false);
-  el.sort.focus();
+  hideMenu();
   if (mode === sortId) return;
   sortId = mode;
   paintSort();
@@ -384,17 +460,89 @@ async function pickSort(mode) {
   resort();        // 换一种排法＝整个列表大搬家，滑动正好说明发生了什么
 }
 
-el.sort.addEventListener('click', () => showMenu(!menuOpen()));
-for (const b of menuItems) b.addEventListener('click', () => pickSort(b.dataset.mode));
+el.sort.addEventListener('click', () => {
+  if (openMenuEl === el.menu) hideMenu();
+  else showMenu(el.menu, el.sort, sortItems.find((b) => b.dataset.mode === sortId) || sortItems[0]);
+});
+for (const b of sortItems) b.addEventListener('click', () => pickSort(b.dataset.mode));
 
-/* 点菜单外面：只关菜单，并且把这一下吃掉——不然它会继续传下去，正落在某一行上，
- * 顺手把人家的开关翻了。所以这个监听挂在捕获阶段：它比行的点击处理先跑，
- * stopPropagation() 之后事件就到不了那一行。 */
+// ── 行的动作菜单（右键 / Shift+F10 / 菜单键）───────────────────────
+
+const STORE = 'https://chromewebstore.google.com/detail/';
+
+const openTab = (url) => chrome.tabs.create({ url });
+
+/* 菜单项就这几条，列出来的顺序就是从上到下的顺序。when 不成立的那项不出现：宁可不显示，
+ * 也不给一个点了没反应的项。 */
+const ROW_ACTIONS = [
+  { label: '打开详情页', run: (it) => openTab('chrome://extensions/?id=' + it.id) },
+  { label: '打开选项页', when: (it) => it.optionsUrl, run: (it) => openTab(it.optionsUrl) },
+  { label: '打开主页', when: (it) => it.homepageUrl, run: (it) => openTab(it.homepageUrl) },
+  { label: '在应用商店中打开', when: (it) => it.fromStore, run: (it) => openTab(STORE + it.id) },
+  { label: '复制扩展 ID', run: (it) => copyId(it) },
+  { sep: true },
+  { label: '卸载', run: (it) => uninstall(it) },
+];
+
+/* 项是每次右键现建的：哪几项在，要看那个扩展自己有没有选项页、主页，是不是商店装的。 */
+function buildRowMenu(it) {
+  const frag = document.createDocumentFragment();
+  for (const a of ROW_ACTIONS) {
+    if (a.when && !a.when(it)) continue;
+    if (a.sep) {
+      frag.append(Object.assign(document.createElement('div'), { className: 'sep' }));
+      continue;
+    }
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.setAttribute('role', 'menuitem');
+    b.textContent = a.label;
+    b.addEventListener('click', () => { hideMenu(); a.run(it); });
+    frag.append(b);
+  }
+  el.rowMenu.replaceChildren(frag);
+}
+
+/* 贴光标摆，并且贴着面板边缘收拢：右边放不下往左挪，下边放不下往上弹。不收的话，
+ * 靠底那几行的菜单会有一半伸到面板外面——面板只有 300 宽、几行高，这不是边角情况。 */
+function placeRowMenu(x, y) {
+  const r = el.rowMenu.getBoundingClientRect();
+  const pad = 6;
+  const vw = document.documentElement.clientWidth;
+  const vh = document.documentElement.clientHeight;
+  el.rowMenu.style.left = Math.max(pad, Math.min(x, vw - r.width - pad)) + 'px';
+  el.rowMenu.style.top = Math.max(pad, Math.min(y, vh - r.height - pad)) + 'px';
+}
+
+function openRowMenu(it, x, y) {
+  buildRowMenu(it);
+  // 先 showMenu 再加高亮：showMenu 会把上一份菜单收掉，收的时候要摘的是**上一行**的
+  // 高亮。反过来的话它摘掉的会是刚加上的这一行的。
+  showMenu(el.rowMenu, it.row);
+  it.row.classList.add('acting');       // 标出这个菜单管的是哪一行
+  placeRowMenu(x, y);
+}
+
+/* 右键某一行。Shift+F10 和菜单键在浏览器里触发的也是这个事件，所以键盘入口是白拿的
+ * ——只是那种情况下事件坐标是 0,0，得改成贴着那一行弹。 */
+el.list.addEventListener('contextmenu', (e) => {
+  if (!(e.target instanceof Element)) return;
+  const row = e.target.closest('.row');
+  const it = row && byId.get(row.dataset.id);
+  if (!it) return;
+  e.preventDefault();                   // 不弹浏览器自己的那份菜单
+  const box = row.getBoundingClientRect();
+  openRowMenu(it, e.clientX || box.left + 14, e.clientY || box.top + 8);
+});
+
+/* 点菜单外面：只关菜单，并且把这一下吃掉——这一下不该再落到别的东西上去（翻开关、
+ * 按底栏按钮、跳进搜索框都不行）。所以这个监听挂在捕获阶段：它比行和底栏那两处的
+ * 点击处理先跑，stopPropagation() 之后事件就到不了它们。
+ * 唯一的例外是菜单自己：那交给菜单项自己的处理（点完关掉、执行）。 */
 document.addEventListener('click', (e) => {
-  if (!menuOpen()) return;
-  if (e.target instanceof Element
-    && (e.target.closest('#sort-menu') || e.target.closest('#sort'))) return;
-  showMenu(false);
+  if (!openMenuEl || !(e.target instanceof Element)) return;
+  if (e.target.closest('.menu')) return;
+  hideMenu(false);
   e.stopPropagation();
 }, true);
 
@@ -474,13 +622,14 @@ chrome.management.onDisabled.addListener((info) => syncOne(info.id, false));
  * 开关本身是 <button role="switch">，回车和空格的切换是浏览器给的。
  * 菜单开着的时候方向键归菜单——不然一下会同时挪两处焦点。 */
 document.addEventListener('keydown', (e) => {
-  if (menuOpen()) {
+  if (openMenuEl) {
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
     e.preventDefault();
-    const i = menuItems.indexOf(document.activeElement);
+    const btns = [...openMenuEl.querySelectorAll('button')];
+    const i = btns.indexOf(document.activeElement);
     const step = e.key === 'ArrowDown' ? 1 : -1;
-    const next = i < 0 ? (step > 0 ? 0 : menuItems.length - 1) : i + step;
-    if (next >= 0 && next < menuItems.length) menuItems[next].focus();
+    const next = i < 0 ? (step > 0 ? 0 : btns.length - 1) : i + step;
+    if (next >= 0 && next < btns.length) btns[next].focus();
     return;
   }
 

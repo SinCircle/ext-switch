@@ -34,7 +34,13 @@ function runFull(args) {
   const pick = (tag) => stdout.split('\n')
     .filter((l) => l.startsWith(tag))
     .map((l) => JSON.parse(l.slice(tag.length)));
-  return { dumps: pick('[dump] '), probes: pick('[probe] ') };
+  return {
+    dumps: pick('[dump] '),
+    probes: pick('[probe] '),
+    targets: pick('[targets] '),     // 打开着的标签页（传了 --targets 才有）
+    keyMenus: pick('[key-menu] '),   // 键盘唤醒菜单时行顶/菜单顶在哪（传了 --key-menu 才有）
+    rightClicks: pick('[right-click] '),   // 每次右键点在哪（传了 --right-click 才有）
+  };
 }
 
 /* 动画的判据不是"animate() 被调用过"，而是三条一起成立：
@@ -369,6 +375,226 @@ const CASES = [
       ];
     },
   },
+
+  // ── 右键的动作菜单 ────────────────────────────────────────────────
+
+  {
+    // 菜单项是"按这个扩展自身的情况"定的：alpha 有选项页也有主页，所以五项都在，
+    // 唯独没有「在应用商店中打开」——它是开发方式装的，那条链接对它是个 404 页面。
+    // 面板的视口就是 300×560（驱动的默认），菜单整块得落在里面。
+    name: '右键某一行：菜单按这个扩展自己的情况列项，且不碰开关',
+    args: ['--fixtures', '--dump', '--right-click', `name=${ALPHA}`],
+    check([before, after], probes, targets, keys, rcs) {
+      const rm = after.rowMenu;
+      return [
+        ...ok(rm.open === true, '右键之后菜单该是开着的'),
+        ...ok(JSON.stringify(rm.items) === JSON.stringify(
+          ['打开详情页', '打开选项页', '打开主页', '复制扩展 ID', '卸载']),
+          `菜单项不对：${JSON.stringify(rm.items)}`),
+        ...ok(rm.acting === ALPHA, `菜单该冲着 Alpha 那一行，实际 "${rm.acting}"`),
+        ...ok(!!rm.rect && rm.rect.left >= 0 && rm.rect.top >= 0
+          && rm.rect.left + rm.rect.w <= after.viewport.w
+          && rm.rect.top + rm.rect.h <= after.viewport.h,
+          `菜单该整块落在面板里（面板 ${after.viewport.w}×${after.viewport.h}），实际 ${JSON.stringify(rm.rect)}`),
+        // 菜单够窄的话，就不用往左跳——正落在光标上（面板一共才 300 宽，宽了必然要挪）
+        ...ok(!!rm.rect && Math.abs(rm.rect.left - rcs[0].x) <= 2,
+          `菜单该正落在光标上（右键在 x=${rcs[0].x}，菜单左边缘 ${rm.rect.left}）`),
+        // 鼠标右键弹出来的菜单不该顶着焦点环（虽然焦点确实挪进了菜单，方向键要用）
+        ...ok(after.activeOutline === 'none',
+          `鼠标右键弹的菜单不该有焦点环，实际 "${after.activeOutline}"`),
+        ...ok(JSON.stringify(onState(after)) === JSON.stringify(onState(before)),
+          '右键不该翻任何一行的开关'),
+        ...ok(after.mismatched === 0, `${after.mismatched} 行不一致`),
+      ];
+    },
+  },
+  {
+    name: '没有选项页也没有主页的扩展：那两项根本不出现',
+    args: ['--fixtures', '--dump', '--right-click', `name=${GAMMA}`],
+    check([, after]) {
+      return [
+        ...ok(JSON.stringify(after.rowMenu.items) === JSON.stringify(
+          ['打开详情页', '复制扩展 ID', '卸载']),
+          `菜单项不对：${JSON.stringify(after.rowMenu.items)}`),
+      ];
+    },
+  },
+  {
+    // 菜单开着的时候直接右键另一行：菜单该跟着换行，高亮也只该留一处。
+    // 这条守的是一个具体写法：showMenu 只比"要开的那个菜单是不是同一个"就提前返回的话，
+    // 第二行看着弹了菜单，其实菜单还挂在第一行名下。
+    name: '右键换一行：菜单跟着换行，高亮只留一处',
+    args: ['--fixtures', '--dump', '--right-click', `name=${ALPHA}`,
+      '--right-click', `name=${GAMMA}`],
+    check(dumps) {
+      const after = dumps[2];
+      return [
+        ...ok(after.rowMenu.acting === GAMMA, `该换成 Gamma 那一行，实际 "${after.rowMenu.acting}"`),
+        ...ok(after.rowMenu.items.length === 3, '菜单内容也该换成 Gamma 的（三项）'),
+        ...ok(after.mismatched === 0, `${after.mismatched} 行不一致`),
+      ];
+    },
+  },
+  {
+    name: '复制扩展 ID：写进剪贴板的是那个 id，菜单自己收起来',
+    args: ['--fixtures', '--dump', '--probe-clipboard', '--right-click', `name=${ALPHA}`,
+      '--click', 'text=复制扩展 ID'],
+    // 三次 dump：开菜单之前、右键之后、点完菜单项之后。要的是最后那一份。
+    check([before, , after]) {
+      const alpha = before.rows.find((r) => r.name === ALPHA) || {};
+      return [
+        ...ok(JSON.stringify(after.copied) === JSON.stringify([alpha.id]),
+          `该把 Alpha 的 id 写进剪贴板，实际 ${JSON.stringify(after.copied)}`),
+        ...ok(after.rowMenu.open === false, '做完菜单该自己收起来'),
+        ...ok(after.toast.includes('已复制'), `该给一句提示，实际 "${after.toast}"`),
+        ...ok(JSON.stringify(onState(after)) === JSON.stringify(onState(before)),
+          '复制不该碰开关'),
+        ...ok(after.mismatched === 0, `${after.mismatched} 行不一致`),
+      ];
+    },
+  },
+  {
+    // 三项「打开」各自开到对的地方。判据在浏览器那一侧：真的多出来那几个标签页
+    // ——面板自己没申请 tabs 权限，读不到 tab 的 url，所以是驱动从浏览器那侧读的。
+    name: '打开详情页 / 选项页 / 主页：各自开出对应的标签页',
+    args: ['--fixtures', '--dump', '--targets',
+      '--right-click', `name=${ALPHA}`, '--click', 'text=打开详情页',
+      '--right-click', `name=${ALPHA}`, '--click', 'text=打开选项页',
+      '--right-click', `name=${ALPHA}`, '--click', 'text=打开主页'],
+    check(dumps, probes, targets) {
+      const id = (dumps[1].rows.find((r) => r.name === ALPHA) || {}).id;
+      const has = (t, s) => t.some((u) => u.includes(s));
+      return [
+        ...ok(!has(targets[0], 'chrome://extensions') && !has(targets[0], 'options.html')
+          && !has(targets[0], 'example.com'), '一开始不该开着这些标签页'),
+        ...ok(has(targets[2], 'chrome://extensions/?id=' + id),
+          `详情页没开出来：${JSON.stringify(targets[2])}`),
+        ...ok(has(targets[4], 'chrome-extension://' + id + '/options.html'),
+          `选项页没开出来：${JSON.stringify(targets[4])}`),
+        ...ok(has(targets[6], 'https://example.com/alpha-notes'),
+          `主页没开出来：${JSON.stringify(targets[6])}`),
+        ...ok(dumps[6].mismatched === 0, `${dumps[6].mismatched} 行不一致`),
+      ];
+    },
+  },
+  {
+    name: '动作菜单开着时点别处：只关菜单，不顺手把底下那一行的开关翻掉',
+    args: ['--fixtures', '--dump', '--right-click', `name=${ALPHA}`, '--click', `name=${LONG}`],
+    check(dumps) {
+      const [before, opened, after] = dumps;
+      return [
+        ...ok(opened.rowMenu.open === true, '右键后菜单该开着'),
+        ...ok(after.rowMenu.open === false, '点别处菜单该关掉'),
+        ...ok(JSON.stringify(onState(after)) === JSON.stringify(onState(before)),
+          '这一下只该关菜单，不该翻任何一行'),
+        ...ok(after.mismatched === 0, `${after.mismatched} 行不一致`),
+      ];
+    },
+  },
+  {
+    // 菜单开着的时候，点哪儿都只该关掉菜单：底栏按钮不该被按到、搜索框不该跳进去、
+    // 连**被右键的那一行自己**也不该顺手开关（这一条是实测后改的：原来把"开菜单的那个
+    // 元素"当例外放行了，结果右键盘完想点一下收起来，反倒把开关翻了）。
+    name: '动作菜单开着时，点哪儿都只关菜单：底栏按钮、搜索框、被右键的那一行都不触发',
+    args: ['--fixtures', '--dump',
+      '--right-click', `name=${ALPHA}`, '--click', '#q',
+      '--right-click', `name=${ALPHA}`, '--click', 'text=全部开',
+      '--right-click', `name=${ALPHA}`, '--click', `row=${ALPHA}`],
+    check(dumps) {
+      const before = dumps[0];
+      const what = ['搜索框', '底栏「全部开」', '被右键的那一行（它自己的开关）'];
+      const bad = [];
+      [2, 4, 6].forEach((i, k) => {
+        const d = dumps[i];
+        bad.push(...ok(d.rowMenu.open === false, `点${what[k]}之后菜单该关掉`));
+        bad.push(...ok(JSON.stringify(onState(d)) === JSON.stringify(onState(before)),
+          `点${what[k]}只该关菜单，不该翻任何一行`));
+        bad.push(...ok(d.toast === '', `点${what[k]}不该触发任何动作，实际弹了 "${d.toast}"`));
+        bad.push(...ok(d.mismatched === 0, `${d.mismatched} 行不一致`));
+      });
+      return bad;
+    },
+  },
+  {
+    // 卸载在这一档是**打桩**的：真调用一定会弹 Chrome 自己的确认框（官方文档写明
+    // "扩展卸别的扩展时 showConfirmDialog 参数被忽略"），无头下没人点它、await 直接挂死。
+    // 所以这条验的是面板那笔账——行消失、计数对齐、提示如实——不是 Chrome 真把扩展卸掉了。
+    name: '卸载：那一行从列表里消失，别的行不动，提示如实',
+    args: ['--fixtures', '--dump', '--probe-uninstall', 'resolve',
+      '--right-click', `name=${GAMMA}`, '--click', 'text=卸载'],
+    // 三次 dump：开菜单之前、右键之后、点「卸载」之后。看最后那一份。
+    check([before, , after]) {
+      const gamma = before.rows.find((r) => r.name === GAMMA) || {};
+      return [
+        ...ok(JSON.stringify(after.uninstalled) === JSON.stringify([gamma.id]),
+          `该把 Gamma 的 id 交给 management.uninstall，实际 ${JSON.stringify(after.uninstalled)}`),
+        ...ok(after.shown === 3, `该剩 3 行，实际 ${after.shown}`),
+        ...ok(!names(after).includes(GAMMA), 'Gamma 该从列表里消失'),
+        ...ok(after.toast === `已卸载「${GAMMA}」`, `提示不对：${JSON.stringify(after.toast)}`),
+        ...ok(after.mismatched === 0, `${after.mismatched} 行不一致`),
+      ];
+    },
+  },
+  {
+    // 用户在 Chrome 那个确认框里点了取消（promise reject）：什么都没变，就什么都不说。
+    // 他刚亲手点了取消，再弹一句"没卸载"是废话——这条守着的就是"别多嘴"。
+    name: '卸载被取消：列表和状态一点不动，也不弹提示',
+    args: ['--fixtures', '--dump', '--probe-uninstall', 'reject',
+      '--right-click', `name=${GAMMA}`, '--click', 'text=卸载'],
+    check([before, , after]) {
+      return [
+        ...ok(after.uninstalled.length === 1, '确实该调过 management.uninstall'),
+        ...ok(after.shown === before.shown, '取消之后行数不该变'),
+        ...ok(after.toast === '', `取消不该弹提示，实际 "${after.toast}"`),
+        ...ok(JSON.stringify(onState(after)) === JSON.stringify(onState(before)), '状态不该变'),
+        ...ok(after.mismatched === 0, `${after.mismatched} 行不一致`),
+      ];
+    },
+  },
+  {
+    // Shift+F10 / 菜单键在浏览器里触发的也是 contextmenu 事件，键盘入口是白拿的。
+    // 实测：headless 上真按 Shift+F10 会由浏览器自己产生那个事件（how==='real'），
+    // 而且**坐标是真的**（落在那一行上），所以那句"坐标为零就贴行弹"的兜底平时踩不到
+    // ——第二条专门用没有坐标的事件把它踩出来：那种情况下不能缩到面板左上角去。
+    name: '键盘也能开菜单：真 Shift+F10，以及事件没有坐标时贴着那一行弹',
+    args: ['--fixtures', '--dump', '--key-menu', `name=${ALPHA}`,
+      '--key-menu-zero', `name=${GAMMA}`],
+    check(dumps, probes, targets, keys) {
+      const [real, zero] = keys;
+      return [
+        ...ok(real.how === 'real', `真按 Shift+F10 该由浏览器产生 contextmenu，实际 ${real.how}`),
+        ...ok(real.menuTop !== null, 'Shift+F10 之后菜单该开着'),
+        ...ok(real.menuTop >= real.rowTop && real.menuTop <= real.rowTop + 38,
+          `菜单该落在那一行上（行顶 ${real.rowTop}，菜单顶 ${real.menuTop}）`),
+        // 反过来的那一半：键盘唤起的菜单必须看得见焦点在哪（鼠标弹的才不画，见上一条场景）
+        ...ok(dumps[1].activeOutline !== 'none',
+          `键盘唤起的菜单该画出焦点环，实际 "${dumps[1].activeOutline}"`),
+        ...ok(zero.menuTop !== null, '没有坐标的那次也该开出菜单'),
+        ...ok(Math.abs(zero.menuTop - (zero.rowTop + 8)) <= 2,
+          `没有坐标时该贴着那一行弹（行顶 ${zero.rowTop}，菜单顶 ${zero.menuTop}）`),
+        ...ok(zero.menuLeft > 0, `没有坐标时不该缩到面板左上角（菜单左侧 ${zero.menuLeft}）`),
+        ...ok(dumps[2].mismatched === 0, `${dumps[2].mismatched} 行不一致`),
+      ];
+    },
+  },
+  {
+    // 面板只有 300 宽、几行高（4 个扩展时整块约 235 高），靠底那一行的菜单不收边就会
+    // 有一截伸到面板外面。把视口设成 250 高（贴着真面板的尺寸），右键最下面那一行。
+    // 判据是"收进来了，而且是贴着下边缘停住"——不收的话菜单底会到 281，超出面板。
+    name: '右键靠底那一行：菜单贴着面板下边缘往上收，不伸到外面',
+    args: ['--fixtures', '--dump', '--height', '250', '--right-click', `name=${BETA}`],
+    check([, after]) {
+      const r = after.rowMenu.rect;
+      const vp = after.viewport;
+      return [
+        ...ok(after.rowMenu.open === true, '菜单该开着'),
+        ...ok(!!r && r.top >= 0 && r.left >= 0 && r.left + r.w <= vp.w && r.top + r.h <= vp.h,
+          `菜单该整块落在面板里（面板 ${vp.w}×${vp.h}），实际 ${JSON.stringify(r)}`),
+        ...ok(!!r && r.top + r.h > vp.h - 20,
+          `收进来之后该贴着下边缘，而不是缩到上半截去，实际 ${JSON.stringify(r)}`),
+      ];
+    },
+  },
 ];
 
 let failed = 0;
@@ -376,7 +602,7 @@ for (const c of CASES) {
   let bad;
   try {
     const res = runFull(c.args);
-    bad = c.check(res.dumps, res.probes);
+    bad = c.check(res.dumps, res.probes, res.targets, res.keyMenus, res.rightClicks);
   } catch (e) {
     // 驱动挂了的话，真正的死因通常在 stdout（它自己的 [fatal] / [warn] 都打在那儿），
     // 只报 stderr 会漏掉——之前就是这么把一条 exit 1 查成了"内容不对"。
