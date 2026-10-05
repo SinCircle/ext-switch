@@ -114,6 +114,62 @@ const realState = (d) => ours(d).map((r) => r.real);
 /** 每条场景返回"不一致的地方"，空数组就是通过。 */
 const CASES = [
   {
+    name: '英文浏览器：名称、按钮、菜单自动切换，批量关闭与撤销仍对齐真实状态',
+    args: ['--lang', 'en-US', '--fixtures', '--dump', '--eval', `({
+      language: chrome.i18n.getUILanguage(), name: chrome.runtime.getManifest().name,
+      title: document.title, htmlLanguage: document.documentElement.lang,
+      search: el.q.placeholder, searchLabel: el.q.getAttribute('aria-label'),
+      buttons: [...document.querySelectorAll('.foot > button')].map(b => b.textContent),
+      sortLabels: [...el.menu.querySelectorAll('button')].map(b => b.textContent),
+      footerFits: [...document.querySelectorAll('.foot > button')].every(b => b.scrollWidth <= b.clientWidth)
+    })`, '--click', '#all-off', '--click', '#undo', '--right-click', 'name=Alpha Notes'],
+    check(dumps, probes, targets, keys, rcs, evaluations) {
+      const [before, off, undone, menu] = dumps;
+      const ui = evaluations[0];
+      return [
+        ...ok(ui.language === 'en-US' && ui.name === 'Extension Switch'
+          && ui.title === ui.name && ui.htmlLanguage === 'en', `英文名称/语言不正确：${JSON.stringify(ui)}`),
+        ...ok(ui.search === 'Search extensions' && ui.searchLabel === ui.search, '搜索提示及无障碍标签应为英文'),
+        ...ok(JSON.stringify(ui.buttons) === JSON.stringify(['All off', 'All on', 'Undo', 'Sort']), '底栏应为英文'),
+        ...ok(JSON.stringify(ui.sortLabels) === JSON.stringify(['Enabled first', 'Name', 'Recently enabled']), '排序菜单应为英文'),
+        ...ok(ui.footerFits, '英文底栏按钮不应溢出'),
+        ...ok(off.rows.every(r => !r.real) && off.toast === 'Disabled: 4', '全部关应成功并显示英文提示'),
+        ...ok(JSON.stringify(onState(undone)) === JSON.stringify(onState(before))
+          && undone.toast === 'Changes undone', '撤销应还原状态并显示英文提示'),
+        ...ok(JSON.stringify(menu.rowMenu.items) === JSON.stringify([
+          'Open details', 'Open options', 'Open homepage', 'Copy extension ID', 'Uninstall'
+        ]), `右键菜单未完整翻译：${JSON.stringify(menu.rowMenu.items)}`),
+        ...ok(dumps.every(d => d.mismatched === 0), '英文界面与真实扩展状态必须一致'),
+      ];
+    },
+  },
+  {
+    name: '英文浏览器：搜索无结果时显示英文且保留原始查询',
+    args: ['--lang', 'en-GB', '--fixtures', '--type', 'missing-example', '--dump'],
+    check([after]) {
+      return [
+        ...ok(after.shown === 0 && after.emptyMsg === 'No extensions match “missing-example”',
+          `空态提示不正确：${after.emptyMsg}`),
+      ];
+    },
+  },
+  {
+    name: '未支持的浏览器语言：完整回退到英文',
+    args: ['--lang', 'fr-FR', '--wait-for', '#empty', '--dump', '--eval', `({
+      language: chrome.i18n.getUILanguage(), name: chrome.runtime.getManifest().name,
+      htmlLanguage: document.documentElement.lang, search: el.q.placeholder
+    })`],
+    check([after], probes, targets, keys, rcs, evaluations) {
+      const ui = evaluations[0];
+      return [
+        ...ok(/^fr(?:-|$)/.test(ui.language) && ui.name === 'Extension Switch'
+          && ui.htmlLanguage === 'en' && ui.search === 'Search extensions',
+          `回退语言不正确：${JSON.stringify(ui)}`),
+        ...ok(after.emptyMsg === 'No extensions to manage', '空面板应回退到英文'),
+      ];
+    },
+  },
+  {
     name: '列表：只列别的扩展、顺序稳定、图标两条路都对',
     args: ['--fixtures', '--dump'],
     check([d]) {

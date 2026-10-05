@@ -1,8 +1,8 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
 <meta charset="utf-8">
-<title>扩展开关</title>
+<title>Extension Switch</title>
 <link rel="stylesheet" href="popup.css">
 </head>
 <body>
@@ -11,39 +11,40 @@
       <circle cx="7" cy="7" r="4.4" fill="none" stroke="currentColor" stroke-width="1.5"/>
       <path d="M10.4 10.4 L14 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
     </svg>
-    <input id="q" type="text" placeholder="搜索扩展" autocomplete="off" spellcheck="false" aria-label="搜索扩展">
-    <button id="clear" type="button" hidden aria-label="清空搜索">
+    <input id="q" type="text" data-i18n-placeholder="searchExtensions" autocomplete="off" spellcheck="false" data-i18n-aria="searchExtensions">
+    <button id="clear" type="button" hidden data-i18n-aria="clearSearch">
       <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 4.5 L11.5 11.5 M11.5 4.5 L4.5 11.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
     </button>
   </div>
 
   <ul id="list" class="list" role="list"></ul>
 
-  <p id="empty" class="empty" hidden>没有匹配的扩展</p>
+  <p id="empty" class="empty" hidden data-i18n="emptySearch"></p>
 
   <p id="hidden-note" class="note" hidden></p>
 
-  <div id="loading" class="empty">读取中…</div>
+  <div id="loading" class="empty" data-i18n="loading"></div>
 
   <div class="foot">
-    <button id="all-off" type="button">全部关</button>
-    <button id="all-on" type="button">全部开</button>
-    <button id="undo" type="button" disabled>撤销</button>
-    <button id="sort" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="sort-menu">排序</button>
+    <button id="all-off" type="button" data-i18n="allOff"></button>
+    <button id="all-on" type="button" data-i18n="allOn"></button>
+    <button id="undo" type="button" disabled data-i18n="undo"></button>
+    <button id="sort" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="sort-menu" data-i18n="sort"></button>
 
-    <div id="sort-menu" class="menu" role="menu" aria-label="排序方式" hidden>
-      <button type="button" role="menuitemradio" data-mode="on-first" aria-checked="true"><span class="tick"></span>开着的排前面</button>
-      <button type="button" role="menuitemradio" data-mode="name" aria-checked="false"><span class="tick"></span>按名称</button>
-      <button type="button" role="menuitemradio" data-mode="recent" aria-checked="false"><span class="tick"></span>最近开启的排前面</button>
+    <div id="sort-menu" class="menu" role="menu" data-i18n-aria="sortOrder" hidden>
+      <button type="button" role="menuitemradio" data-mode="on-first" aria-checked="true"><span class="tick"></span><span data-i18n="sortOnFirst"></span></button>
+      <button type="button" role="menuitemradio" data-mode="name" aria-checked="false"><span class="tick"></span><span data-i18n="sortName"></span></button>
+      <button type="button" role="menuitemradio" data-mode="recent" aria-checked="false"><span class="tick"></span><span data-i18n="sortRecent"></span></button>
     </div>
   </div>
 
   <!-- 右键某一行的动作菜单。项是右键时现建的：哪几项在要看那个扩展自己有没有选项页、
        主页，是不是从商店装的，所以不写死在这儿。 -->
-  <div id="row-menu" class="menu ctx" role="menu" aria-label="扩展操作" hidden></div>
+  <div id="row-menu" class="menu ctx" role="menu" data-i18n-aria="extensionActions" hidden></div>
 
   <div id="toast" class="toast" role="status" hidden></div>
 
+  <script src="i18n.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

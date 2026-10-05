@@ -1,54 +1,54 @@
 {
   "extensionName": {
-    "message": "扩展开关"
+    "message": "Extension Switch"
   },
   "extensionDescription": {
-    "message": "一键开关浏览器扩展，支持搜索、批量操作和撤销。"
+    "message": "Switch extensions on and off. Search, sort, and undo bulk changes."
   },
   "uiLanguage": {
-    "message": "zh-CN"
+    "message": "en"
   },
   "searchExtensions": {
-    "message": "搜索扩展"
+    "message": "Search extensions"
   },
   "clearSearch": {
-    "message": "清空搜索"
+    "message": "Clear search"
   },
   "emptySearch": {
-    "message": "没有匹配的扩展"
+    "message": "No matching extensions"
   },
   "loading": {
-    "message": "读取中…"
+    "message": "Loading…"
   },
   "allOff": {
-    "message": "全部关"
+    "message": "All off"
   },
   "allOn": {
-    "message": "全部开"
+    "message": "All on"
   },
   "undo": {
-    "message": "撤销"
+    "message": "Undo"
   },
   "sort": {
-    "message": "排序"
+    "message": "Sort"
   },
   "sortOrder": {
-    "message": "排序方式"
+    "message": "Sort order"
   },
   "sortOnFirst": {
-    "message": "开着的排前面"
+    "message": "Enabled first"
   },
   "sortName": {
-    "message": "按名称"
+    "message": "Name"
   },
   "sortRecent": {
-    "message": "最近开启的排前面"
+    "message": "Recently enabled"
   },
   "extensionActions": {
-    "message": "扩展操作"
+    "message": "Extension actions"
   },
   "enableError": {
-    "message": "无法启用「$NAME$」",
+    "message": "Could not enable “$NAME$”.",
     "placeholders": {
       "name": {
         "content": "$1"
@@ -56,7 +56,7 @@
     }
   },
   "disableError": {
-    "message": "无法停用「$NAME$」",
+    "message": "Could not disable “$NAME$”.",
     "placeholders": {
       "name": {
         "content": "$1"
@@ -64,13 +64,13 @@
     }
   },
   "alreadyAllOn": {
-    "message": "已经全部开启"
+    "message": "All extensions are already on."
   },
   "alreadyAllOff": {
-    "message": "已经全部关闭"
+    "message": "All extensions are already off."
   },
   "bulkOnDone": {
-    "message": "已开启 $COUNT$ 个",
+    "message": "Enabled: $COUNT$",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -78,7 +78,7 @@
     }
   },
   "bulkOffDone": {
-    "message": "已关闭 $COUNT$ 个",
+    "message": "Disabled: $COUNT$",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -86,7 +86,7 @@
     }
   },
   "bulkOnPartial": {
-    "message": "已开启 $COUNT$ 个，$FAILED$ 个失败",
+    "message": "Enabled: $COUNT$ · Failed: $FAILED$",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -97,7 +97,7 @@
     }
   },
   "bulkOffPartial": {
-    "message": "已关闭 $COUNT$ 个，$FAILED$ 个失败",
+    "message": "Disabled: $COUNT$ · Failed: $FAILED$",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -108,10 +108,10 @@
     }
   },
   "undoDone": {
-    "message": "已撤销"
+    "message": "Changes undone"
   },
   "undoPartial": {
-    "message": "已撤销，$FAILED$ 个失败",
+    "message": "Undo completed · Failed: $FAILED$",
     "placeholders": {
       "failed": {
         "content": "$1"
@@ -119,7 +119,7 @@
     }
   },
   "copiedId": {
-    "message": "已复制「$NAME$」的扩展 ID",
+    "message": "Copied the ID for “$NAME$”",
     "placeholders": {
       "name": {
         "content": "$1"
@@ -127,7 +127,7 @@
     }
   },
   "copyError": {
-    "message": "复制失败：$ERROR$",
+    "message": "Could not copy: $ERROR$",
     "placeholders": {
       "error": {
         "content": "$1"
@@ -135,7 +135,7 @@
     }
   },
   "uninstalled": {
-    "message": "已卸载「$NAME$」",
+    "message": "Uninstalled “$NAME$”",
     "placeholders": {
       "name": {
         "content": "$1"
@@ -143,10 +143,10 @@
     }
   },
   "emptyExtensions": {
-    "message": "没有可开关的扩展"
+    "message": "No extensions to manage"
   },
   "noMatches": {
-    "message": "没有叫「$QUERY$」的扩展",
+    "message": "No extensions match “$QUERY$”",
     "placeholders": {
       "query": {
         "content": "$1"
@@ -154,25 +154,25 @@
     }
   },
   "openDetails": {
-    "message": "打开详情页"
+    "message": "Open details"
   },
   "openOptions": {
-    "message": "打开选项页"
+    "message": "Open options"
   },
   "openHomepage": {
-    "message": "打开主页"
+    "message": "Open homepage"
   },
   "openStore": {
-    "message": "在应用商店中打开"
+    "message": "View in store"
   },
   "copyId": {
-    "message": "复制扩展 ID"
+    "message": "Copy extension ID"
   },
   "uninstall": {
-    "message": "卸载"
+    "message": "Uninstall"
   },
   "skippedExtensions": {
-    "message": "已跳过 $COUNT$ 个浏览器内置扩展（无法停用）",
+    "message": "Built-in extensions skipped: $COUNT$ (cannot be disabled)",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -180,7 +180,7 @@
     }
   },
   "loadError": {
-    "message": "读不到扩展列表：$ERROR$",
+    "message": "Could not load extensions: $ERROR$",
     "placeholders": {
       "error": {
         "content": "$1"

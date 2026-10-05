@@ -5,7 +5,8 @@
 <title>扩展开关隐私政策</title>
 <style>body{max-width:780px;margin:48px auto;padding:0 24px;font:16px/1.8 system-ui,"Microsoft YaHei",sans-serif;color:#202124}h1{font-size:30px}h2{font-size:21px;margin-top:28px}a{color:#175cd3}small{color:#667085}</style>
 <h1>扩展开关隐私政策</h1>
-<p><small>生效日期：2026 年 10 月 5 日。适用版本：1.1.1。</small></p>
+<p><a href="#english">English</a></p>
+<p><small>生效日期：2026 年 10 月 5 日。适用版本：1.2.0。</small></p>
 <p>扩展开关由 SinCircle 开发，用于在工具栏面板中管理本机浏览器扩展。本政策说明扩展会访问哪些信息、这些信息如何使用和保存，以及如何联系开发者。</p>
 <h2>本机访问和处理的信息</h2>
 <p>打开面板时，扩展通过浏览器的 management API 获取已安装扩展的名称、ID、图标、启用状态、是否可管理，以及选项页、主页和更新服务地址。这些信息用于显示列表、搜索、排序、切换启用状态、判断来源商店，以及执行用户主动选择的详情页、选项页、主页、商店跳转或卸载操作。扩展不读取网页内容、浏览历史、密码、账户信息或网站表单。</p>
@@ -22,4 +23,18 @@
 <p>项目主页：<a href="https://github.com/SinCircle/ext-switch">github.com/SinCircle/ext-switch</a>。反馈和隐私问题可通过<a href="https://github.com/SinCircle/ext-switch/issues">项目 Issues</a>联系开发者。提交 Issue 时请勿提供密码、验证码或不希望公开的个人信息；GitHub 会按照其隐私政策处理该服务中的信息。</p>
 <h2>政策更新</h2>
 <p>如后续版本改变数据处理方式，本政策会同步更新日期和适用版本，并在商店发布资料中提供对应说明。</p>
+<section id="english" lang="en">
+<h1>Extension Switch Privacy Policy</h1>
+<p><small>Effective October 5, 2026. Applies to version 1.2.0.</small></p>
+<p>Extension Switch is developed by SinCircle to manage browser extensions from the toolbar.</p>
+<h2>Local access and storage</h2>
+<p>When you open the popup, the management API reads installed extensions' names, IDs, icons, enabled state, manageability, and options, homepage and update URLs. This supports search, sorting, toggles, store links and actions you select. The extension does not read web page content, browsing history, passwords, account information or website forms.</p>
+<p>storage.local saves your sort preference and the IDs and timestamps of extensions enabled through the popup. storage.session saves the state before the last bulk action, including extension IDs, enabled states and timestamps, so it can be undone. The snapshot is deleted after undo and session storage is cleared when the browser session ends. No storage.sync is used.</p>
+<h2>Sharing and permissions</h2>
+<p>No extension lists, activity or preferences are uploaded, sold or shared. There is no collection server, advertising, analytics, telemetry or remotely executed code. The management permission enables the core extension management actions; storage keeps local preferences and the undo snapshot. No website access, browsing history or sensitive tab-reading permission is requested.</p>
+<p>If you choose to open another extension's homepage, a store page or our support page, that website handles your visit under its own privacy policy. Extension Switch does not attach your extension list or activity records. Copying an ID writes only the selected ID to your local clipboard.</p>
+<h2>Your control and contact</h2>
+<p>Uninstalling Extension Switch removes its saved local data. Changes you made to other extensions remain in the browser and are not automatically reversed. Contact the developer through <a href="https://github.com/SinCircle/ext-switch/issues">GitHub Issues</a>. Do not post passwords, verification codes or private information. GitHub processes submissions under its own policy.</p>
+<p>This policy will be updated if a later version changes how data is handled.</p>
+</section>
 </html>

@@ -51,6 +51,7 @@ const has = (n) => args.includes(n);
 const EXT = resolve(flag('--ext') || ROOT);
 const WAIT_FOR = flag('--wait-for') || '#list .row';
 const SHOT = flag('--shot');
+const LANGUAGE = flag('--lang') || 'zh-CN';
 const EVALS = [];
 const ACTIONS = [];        // 按命令行里的先后顺序：{kind: 'click' | 'right', sel}
 for (let i = 0; i < args.length; i++) {
@@ -86,6 +87,7 @@ const out = (s) => { lines.push(s); console.log(s); };
 const chrome = spawn(CHROME, [
   `--remote-debugging-port=${PORT}`,
   `--user-data-dir=${profile}`,
+  `--lang=${LANGUAGE}`,
   '--no-first-run',
   '--no-default-browser-check',
   '--disable-gpu',
@@ -195,7 +197,7 @@ await page.call('Log.enable');
 await page.call('Page.enable');
 /* 视口就设成 popup 的真宽度：截图才跟用户看到的一致，量尺寸也才是真的。 */
 await page.call('Emulation.setDeviceMetricsOverride',
-  { width: VIEW_W, height: VIEW_H, deviceScaleFactor: 2, mobile: false });
+  { width: VIEW_W, height: VIEW_H, deviceScaleFactor: Number(flag('--dpr') || 2), mobile: false });
 const media = [];
 if (has('--dark')) media.push({ name: 'prefers-color-scheme', value: 'dark' });
 // 减少动态效果：面板里的动画要靠 matchMedia 判断（CSS 里那句 animation:none 拦不住

@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
   "name": "__MSG_extensionName__",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "description": "__MSG_extensionDescription__",
-  "default_locale": "zh_CN",
+  "default_locale": "en",
   "homepage_url": "https://github.com/SinCircle/ext-switch",
   "permissions": ["management", "storage"],
   "action": {

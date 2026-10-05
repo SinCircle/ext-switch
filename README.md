@@ -7,6 +7,9 @@ undo, three sort modes, and a right-click menu per extension.*
 
 Chrome / Edge 通用，Manifest V3，权限只有 `management` 和 `storage`。
 
+支持简体中文和英文，自动跟随浏览器界面语言；其他语言回退为英文。
+Supports Simplified Chinese and English, following the browser UI language automatically.
+
 浏览器的扩展管理页要开标签页、滚动、点两下才到位。而"临时关掉某几个扩展"是高频动作：
 排查冲突、看视频时关掉广告拦截、跑测试时关掉脚本注入。这个面板就是为这件事做的。
 
@@ -59,13 +62,14 @@ Chrome / Edge 通用，Manifest V3，权限只有 `management` 和 `storage`。
 # 造假扩展当测试数据——无头跑的是全新 profile，不装的话列表永远是空的
 uv run --with pillow python test/make-fixtures.py --many 10
 
-# 全部验收：32 条场景，约 2 分钟（--verbose 连原始输出一起打）
+# 全部验收：35 条场景，约 2 分钟（--verbose 连原始输出一起打）
 node test/check.mjs
 
 # 单独用驱动，改完之后肉眼看
 node test/popup-drive.mjs --fixtures --headful
 node test/popup-drive.mjs --fixtures --click "text=排序" --shot out.png
 node test/popup-drive.mjs --fixtures --dark --shot out.png
+node test/popup-drive.mjs --fixtures --lang en-US --dpr 4 --shot english.png
 node test/popup-drive.mjs --fixtures --right-click "name=Alpha Notes" --shot out.png
 ```
 
@@ -74,8 +78,9 @@ node test/popup-drive.mjs --fixtures --right-click "name=Alpha Notes" --shot out
 ```
 manifest.json         权限只有 management + storage；没有后台脚本、没有内容脚本
 popup.html/.css/.js   面板的全部逻辑
+i18n.js / _locales/   原生浏览器语言选择，覆盖界面、提示和元数据
 icons/                图标（tools/make-icons.py 生成）
-test/check.mjs        验收：32 条场景（CHROME_PATH 可指定 Edge）
+test/check.mjs        验收：35 条场景（CHROME_PATH 可指定 Edge）
 test/popup-drive.mjs  无头驱动：装扩展、开 popup、点击/右键、求值、截图
 test/make-fixtures.py 造假扩展当测试数据
 docs/design.md        设计取舍、实测结论、没验到的部分

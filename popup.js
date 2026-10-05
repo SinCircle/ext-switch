@@ -25,11 +25,11 @@ const SNAPSHOT_KEY = 'undoSnapshot';
 const SORT_KEY = 'sort';
 const RECENT_KEY = 'recent';
 
-/* 按名字排：中文按拼音排在前，拉丁 A–Z 在后，希腊字母垫底（localeCompare 的 zh 规则）。
+/* 按当前界面语言的规则排名字；中文按拼音，英文按字母。
  * 名字完全一样时用 id 兜底，保证顺序是确定的——不然同分的行每次排出来的位置可能不同，
  * 看起来就像列表自己在抖。 */
 function byName(a, b) {
-  return a.name.localeCompare(b.name, 'zh-Hans-CN', { numeric: true, sensitivity: 'base' })
+  return a.name.localeCompare(b.name, UI_LANGUAGE, { numeric: true, sensitivity: 'base' })
     || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 }
 
@@ -272,7 +272,7 @@ async function toggle(it) {
     setOn(it, !next);
     resort(it.id);      // 飞回来，比只把开关拨回来更说明"没成"
     await saveRecent();
-    toast(`无法${next ? '启用' : '停用'}「${it.name}」`, 'err');
+    toast(t(next ? 'enableError' : 'disableError', it.name), 'err');
   }
 }
 
@@ -282,7 +282,7 @@ async function toggle(it) {
 async function bulk(target) {
   const changed = items.filter((x) => x.on !== target);
   if (!changed.length) {
-    toast(target ? '已经全部开启' : '已经全部关闭');
+    toast(t(target ? 'alreadyAllOn' : 'alreadyAllOff'));
     return;
   }
 
@@ -308,8 +308,8 @@ async function bulk(target) {
   // 重排放在最后一次性做：一条一条排的话，中间那些状态会来回横跳
   resort();
   await saveRecent();
-  const verb = target ? '开启' : '关闭';
-  toast(failed ? `已${verb} ${changed.length - failed} 个，${failed} 个失败` : `已${verb} ${changed.length} 个`,
+  const key = target ? 'bulkOn' : 'bulkOff';
+  toast(t(key + (failed ? 'Partial' : 'Done'), [String(changed.length - failed), String(failed)]),
     failed ? 'err' : '');
 }
 
@@ -335,7 +335,7 @@ async function undo() {
   // 撤完就清掉：撤销 = 「退掉上一次批量操作」，再点一次没有意义。
   await chrome.storage.session.remove(SNAPSHOT_KEY);
   el.undo.disabled = true;
-  toast(failed ? `已撤销，${failed} 个失败` : '已撤销', failed ? 'err' : '');
+  toast(t(failed ? 'undoPartial' : 'undoDone', String(failed)), failed ? 'err' : '');
 }
 
 /* 复制扩展 ID。写剪贴板不用额外申请权限（实测），但要求文档有焦点——面板开着的时候
@@ -343,9 +343,9 @@ async function undo() {
 async function copyId(it) {
   try {
     await navigator.clipboard.writeText(it.id);
-    toast(`已复制「${it.name}」的扩展 ID`);
+    toast(t('copiedId', it.name));
   } catch (err) {
-    toast('复制失败：' + err.message, 'err');
+    toast(t('copyError', err.message), 'err');
   }
 }
 
@@ -367,7 +367,7 @@ async function uninstall(it) {
   await saveRecent();
   el.allOff.disabled = el.allOn.disabled = !items.length;
   filter();                  // 空面板文案、计数都归它管
-  toast(`已卸载「${it.name}」`);
+  toast(t('uninstalled', it.name));
 }
 
 // ── 过滤 / 提示 ────────────────────────────────────────────────────
@@ -379,7 +379,7 @@ function filter() {
   // 一个可开关的都没有：这是空面板，不是"搜索没命中"，两种话说得不一样
   if (!items.length) {
     el.list.hidden = true;
-    el.empty.textContent = '没有可开关的扩展';
+    el.empty.textContent = t('emptyExtensions');
     el.empty.hidden = false;
     return;
   }
@@ -392,7 +392,7 @@ function filter() {
   }
   el.list.hidden = shown === 0;
   el.empty.hidden = shown > 0;
-  if (q && !shown) el.empty.textContent = `没有叫「${el.q.value.trim()}」的扩展`;
+  if (q && !shown) el.empty.textContent = t('noMatches', el.q.value.trim());
 }
 
 let toastTimer;
@@ -493,13 +493,13 @@ const openTab = (url) => chrome.tabs.create({ url });
 /* 菜单项就这几条，列出来的顺序就是从上到下的顺序。when 不成立的那项不出现：宁可不显示，
  * 也不给一个点了没反应的项。 */
 const ROW_ACTIONS = [
-  { label: '打开详情页', run: (it) => openTab(EXTENSIONS_PAGE + '?id=' + it.id) },
-  { label: '打开选项页', when: (it) => it.optionsUrl, run: (it) => openTab(it.optionsUrl) },
-  { label: '打开主页', when: (it) => it.homepageUrl, run: (it) => openTab(it.homepageUrl) },
-  { label: '在应用商店中打开', when: (it) => it.storeUrl, run: (it) => openTab(it.storeUrl) },
-  { label: '复制扩展 ID', run: (it) => copyId(it) },
+  { label: t('openDetails'), run: (it) => openTab(EXTENSIONS_PAGE + '?id=' + it.id) },
+  { label: t('openOptions'), when: (it) => it.optionsUrl, run: (it) => openTab(it.optionsUrl) },
+  { label: t('openHomepage'), when: (it) => it.homepageUrl, run: (it) => openTab(it.homepageUrl) },
+  { label: t('openStore'), when: (it) => it.storeUrl, run: (it) => openTab(it.storeUrl) },
+  { label: t('copyId'), run: (it) => copyId(it) },
   { sep: true },
-  { label: '卸载', run: (it) => uninstall(it) },
+  { label: t('uninstall'), run: (it) => uninstall(it) },
 ];
 
 /* 项是每次右键现建的：哪几项在，要看那个扩展自己有没有选项页、主页，是不是商店装的。 */
@@ -611,7 +611,7 @@ async function init() {
 
   el.loading.remove();
   if (locked) {
-    el.note.textContent = `已跳过 ${locked} 个浏览器内置扩展（无法停用）`;
+    el.note.textContent = t('skippedExtensions', String(locked));
     el.note.hidden = false;
   }
   el.allOff.disabled = el.allOn.disabled = !items.length;
@@ -688,5 +688,5 @@ document.addEventListener('keydown', (e) => {
  * 两个动作会叠在一起。清空有搜索框右边那个 × 按钮，够用。 */
 
 init().catch((err) => {
-  el.loading.textContent = '读不到扩展列表：' + err.message;
+  el.loading.textContent = t('loadError', err.message);
 });
