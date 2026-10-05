@@ -59,7 +59,7 @@ Chrome / Edge 通用，Manifest V3，权限只有 `management` 和 `storage`。
 # 造假扩展当测试数据——无头跑的是全新 profile，不装的话列表永远是空的
 uv run --with pillow python test/make-fixtures.py --many 10
 
-# 全部验收：31 条场景，约 2 分钟（--verbose 连原始输出一起打）
+# 全部验收：32 条场景，约 2 分钟（--verbose 连原始输出一起打）
 node test/check.mjs
 
 # 单独用驱动，改完之后肉眼看
@@ -75,10 +75,11 @@ node test/popup-drive.mjs --fixtures --right-click "name=Alpha Notes" --shot out
 manifest.json         权限只有 management + storage；没有后台脚本、没有内容脚本
 popup.html/.css/.js   面板的全部逻辑
 icons/                图标（tools/make-icons.py 生成）
-test/check.mjs        验收：31 条场景
+test/check.mjs        验收：32 条场景（CHROME_PATH 可指定 Edge）
 test/popup-drive.mjs  无头驱动：装扩展、开 popup、点击/右键、求值、截图
 test/make-fixtures.py 造假扩展当测试数据
 docs/design.md        设计取舍、实测结论、没验到的部分
+docs/privacy.html     隐私政策：本机扩展信息和存储用途
 ```
 
 验收里最要紧的两条：**界面上的开关状态必须跟 `chrome.management` 报的真实状态一致**
@@ -93,7 +94,7 @@ docs/design.md        设计取舍、实测结论、没验到的部分
 - 内置扩展（`mayDisable === false`，比如 PDF 阅读器）只能跳过，浏览器不许关。
 - 重排不带动滚动：飞到视野外面去的那一行不会把面板滚过去。
 - 排序菜单浮在列表上，扩展少的时候会盖住靠下的几行。
-- 「在应用商店中打开」只在从商店装的扩展上出现（开发方式装的点开是 404，所以干脆不给）。
+- 「在应用商店中打开」按扩展的更新服务区分 Edge 与 Chrome 商店。开发方式安装或来源无法识别的扩展不显示这一项。
 - **卸载没有撤销**：一确认就没了。它在菜单最下面、前面还有一条分隔线，就是为了别顺手点到。
 - 点「卸载」之后面板多半直接就没了——Chrome 的确认框抢走焦点，弹窗跟着关掉。所以
   "那一行消失"多半要等下次打开面板才看得到（那时列表本来就是重新读的）。

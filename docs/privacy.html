@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>扩展开关隐私政策</title>
+<style>body{max-width:780px;margin:48px auto;padding:0 24px;font:16px/1.8 system-ui,"Microsoft YaHei",sans-serif;color:#202124}h1{font-size:30px}h2{font-size:21px;margin-top:28px}a{color:#175cd3}small{color:#667085}</style>
+<h1>扩展开关隐私政策</h1>
+<p><small>生效日期：2026 年 10 月 5 日。适用版本：1.1.1。</small></p>
+<p>扩展开关由 SinCircle 开发，用于在工具栏面板中管理本机浏览器扩展。本政策说明扩展会访问哪些信息、这些信息如何使用和保存，以及如何联系开发者。</p>
+<h2>本机访问和处理的信息</h2>
+<p>打开面板时，扩展通过浏览器的 management API 获取已安装扩展的名称、ID、图标、启用状态、是否可管理，以及选项页、主页和更新服务地址。这些信息用于显示列表、搜索、排序、切换启用状态、判断来源商店，以及执行用户主动选择的详情页、选项页、主页、商店跳转或卸载操作。扩展不读取网页内容、浏览历史、密码、账户信息或网站表单。</p>
+<h2>本地保存的信息</h2>
+<p>storage.local 保存排序偏好，以及由面板启用的扩展 ID 和最近启用时间。storage.session 暂存上一次批量操作前的扩展 ID、启用状态、最近启用时间和快照时间，用于撤销；撤销后删除该快照，浏览器会话结束后会话存储会被清除。这些信息只保存在本机浏览器中，本扩展不使用 storage.sync 将其同步到云端。</p>
+<h2>传输、共享和远程代码</h2>
+<p>本扩展没有数据收集服务器，不上传扩展清单、操作记录或本地偏好，不出售或共享这些信息，也不包含广告、分析统计、遥测或远程执行代码。</p>
+<p>当用户主动选择打开其他扩展的主页、商店页面或本项目的支持页面时，浏览器会访问对应网站。这些网站按其各自的隐私政策处理访问数据；本扩展不向它们附加扩展清单或本地操作记录。</p>
+<h2>权限用途</h2>
+<p>management 权限用于读取、启用、停用和按用户要求卸载其他扩展。storage 权限用于保存本机排序偏好、最近启用时间和撤销快照。扩展不申请网页访问权限、浏览历史权限或标签页敏感信息读取权限。</p>
+<h2>删除和控制</h2>
+<p>可以通过浏览器的扩展管理页面卸载扩展开关，删除本扩展保存的本地数据。通过面板改变的其他扩展启用状态由浏览器保存，卸载扩展开关不会自动还原这些状态。复制扩展 ID 时，仅按用户请求将该 ID 写入本机剪贴板。</p>
+<h2>联系开发者</h2>
+<p>项目主页：<a href="https://github.com/SinCircle/ext-switch">github.com/SinCircle/ext-switch</a>。反馈和隐私问题可通过<a href="https://github.com/SinCircle/ext-switch/issues">项目 Issues</a>联系开发者。提交 Issue 时请勿提供密码、验证码或不希望公开的个人信息；GitHub 会按照其隐私政策处理该服务中的信息。</p>
+<h2>政策更新</h2>
+<p>如后续版本改变数据处理方式，本政策会同步更新日期和适用版本，并在商店发布资料中提供对应说明。</p>
+</html>

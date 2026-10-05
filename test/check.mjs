@@ -17,6 +17,8 @@ import { fileURLToPath } from 'node:url';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const DRIVE = join(ROOT, 'test', 'popup-drive.mjs');
 const VERBOSE = process.argv.includes('--verbose');
+const DETAILS_PAGE = /msedge/i.test(process.env.CHROME_PATH || '')
+  ? 'edge://extensions' : 'chrome://extensions';
 
 const FIXTURES = ['网页深色模式与护眼滤镜自动切换工具', 'Alpha Notes', 'Gamma Block', 'β 阅读器']
   .sort((a, b) => a.localeCompare(b, 'zh-Hans-CN', { numeric: true, sensitivity: 'base' }));
@@ -40,6 +42,7 @@ function runFull(args) {
     targets: pick('[targets] '),     // 打开着的标签页（传了 --targets 才有）
     keyMenus: pick('[key-menu] '),   // 键盘唤醒菜单时行顶/菜单顶在哪（传了 --key-menu 才有）
     rightClicks: pick('[right-click] '),   // 每次右键点在哪（传了 --right-click 才有）
+    evaluations: pick('[eval] '),
   };
 }
 
@@ -477,9 +480,9 @@ const CASES = [
       const id = (dumps[1].rows.find((r) => r.name === ALPHA) || {}).id;
       const has = (t, s) => t.some((u) => u.includes(s));
       return [
-        ...ok(!has(targets[0], 'chrome://extensions') && !has(targets[0], 'options.html')
+        ...ok(!has(targets[0], DETAILS_PAGE) && !has(targets[0], 'options.html')
           && !has(targets[0], 'example.com'), '一开始不该开着这些标签页'),
-        ...ok(has(targets[2], 'chrome://extensions/?id=' + id),
+        ...ok(has(targets[2], DETAILS_PAGE + '/?id=' + id),
           `详情页没开出来：${JSON.stringify(targets[2])}`),
         ...ok(has(targets[4], 'chrome-extension://' + id + '/options.html'),
           `选项页没开出来：${JSON.stringify(targets[4])}`),
@@ -653,6 +656,45 @@ const CASES = [
       ];
     },
   },
+  {
+    name: '混装商店来源：Edge 和 Chrome 链接各自正确，未知来源和开发扩展不显示商店项',
+    args: ['--fixtures', '--dump', '--eval', `(async () => {
+      const originalCreate = chrome.tabs.create;
+      const opened = [];
+      chrome.tabs.create = async ({ url }) => { opened.push(url); };
+      const sources = [
+        ['normal', 'https://edge.microsoft.com/extensionwebstorebase/v1/crx'],
+        ['normal', 'https://clients2.google.com/service/update2/crx?x=id'],
+        ['normal', 'https://example.com/update'],
+        ['normal', 'https://edge.microsoft.com.example.com/extensionwebstorebase/v1/crx'],
+        ['normal', ''],
+        ['development', 'https://edge.microsoft.com/extensionwebstorebase/v1/crx'],
+      ];
+      const storeAction = ROW_ACTIONS.find(a => a.label === '在应用商店中打开');
+      const visible = [];
+      try {
+        for (const [installType, updateUrl] of sources) {
+          const it = { ...items[0], storeUrl: getStoreUrl({ id: 'demo-id', installType, updateUrl }) };
+          buildRowMenu(it);
+          visible.push([...el.rowMenu.querySelectorAll('button')].some(b => b.textContent === storeAction.label));
+          if (storeAction.when(it)) await storeAction.run(it);
+        }
+        return { opened, visible };
+      } finally { chrome.tabs.create = originalCreate; }
+    })()`],
+    check(dumps, probes, targets, keys, rcs, evaluations) {
+      const result = evaluations[0];
+      return [
+        ...ok(JSON.stringify(result.opened) === JSON.stringify([
+          'https://microsoftedge.microsoft.com/addons/detail/demo-id',
+          'https://chromewebstore.google.com/detail/demo-id',
+        ]), `商店链接不正确：${JSON.stringify(result.opened)}`),
+        ...ok(JSON.stringify(result.visible) === JSON.stringify([true, true, false, false, false, false]),
+          `商店项可见性不正确：${JSON.stringify(result.visible)}`),
+        ...ok(dumps[0].mismatched === 0, `${dumps[0].mismatched} 行不一致`),
+      ];
+    },
+  },
 ];
 
 let failed = 0;
@@ -660,7 +702,7 @@ for (const c of CASES) {
   let bad;
   try {
     const res = runFull(c.args);
-    bad = c.check(res.dumps, res.probes, res.targets, res.keyMenus, res.rightClicks);
+    bad = c.check(res.dumps, res.probes, res.targets, res.keyMenus, res.rightClicks, res.evaluations);
   } catch (e) {
     // 驱动挂了的话，真正的死因通常在 stdout（它自己的 [fatal] / [warn] 都打在那儿），
     // 只报 stderr 会漏掉——之前就是这么把一条 exit 1 查成了"内容不对"。

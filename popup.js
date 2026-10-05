@@ -66,7 +66,7 @@ const el = {
   rowMenu: document.getElementById('row-menu'),
 };
 
-/** @type {{id:string,name:string,on:boolean,onAt?:number,icon:string|null,optionsUrl:string,homepageUrl:string,fromStore:boolean,row:HTMLElement,sw:HTMLElement}[]} */
+/** @type {{id:string,name:string,on:boolean,onAt?:number,icon:string|null,optionsUrl:string,homepageUrl:string,storeUrl:string,row:HTMLElement,sw:HTMLElement}[]} */
 const items = [];
 const byId = new Map();
 
@@ -93,7 +93,7 @@ async function readExtensions() {
       // （商店那条链接对开发方式装的扩展是个 404 页面，所以那种情形干脆不给这一项）
       optionsUrl: e.optionsUrl || '',
       homepageUrl: e.homepageUrl || '',
-      fromStore: e.installType === 'normal',
+      storeUrl: getStoreUrl(e),
     });
   }
   return { mine, locked };   // 不在这儿排：排序方式是可配的，交给 resort()
@@ -468,17 +468,35 @@ for (const b of sortItems) b.addEventListener('click', () => pickSort(b.dataset.
 
 // ── 行的动作菜单（右键 / Shift+F10 / 菜单键）───────────────────────
 
-const STORE = 'https://chromewebstore.google.com/detail/';
+// Edge 可以混装两个商店的扩展，按更新服务判断来源，不能按当前浏览器猜。
+// 无法识别来源的扩展不提供商店项，避免把 ID 拼到错误的商店上。
+function getStoreUrl(info) {
+  if (info.installType === 'development') return '';
+  let update;
+  try { update = new URL(info.updateUrl); } catch { return ''; }
+  if (update.origin === 'https://edge.microsoft.com'
+      && update.pathname === '/extensionwebstorebase/v1/crx') {
+    return 'https://microsoftedge.microsoft.com/addons/detail/' + info.id;
+  }
+  if (update.origin === 'https://clients2.google.com'
+      && update.pathname === '/service/update2/crx') {
+    return 'https://chromewebstore.google.com/detail/' + info.id;
+  }
+  return '';
+}
+
+const EXTENSIONS_PAGE = /\bEdg\//.test(navigator.userAgent)
+  ? 'edge://extensions/' : 'chrome://extensions/';
 
 const openTab = (url) => chrome.tabs.create({ url });
 
 /* 菜单项就这几条，列出来的顺序就是从上到下的顺序。when 不成立的那项不出现：宁可不显示，
  * 也不给一个点了没反应的项。 */
 const ROW_ACTIONS = [
-  { label: '打开详情页', run: (it) => openTab('chrome://extensions/?id=' + it.id) },
+  { label: '打开详情页', run: (it) => openTab(EXTENSIONS_PAGE + '?id=' + it.id) },
   { label: '打开选项页', when: (it) => it.optionsUrl, run: (it) => openTab(it.optionsUrl) },
   { label: '打开主页', when: (it) => it.homepageUrl, run: (it) => openTab(it.homepageUrl) },
-  { label: '在应用商店中打开', when: (it) => it.fromStore, run: (it) => openTab(STORE + it.id) },
+  { label: '在应用商店中打开', when: (it) => it.storeUrl, run: (it) => openTab(it.storeUrl) },
   { label: '复制扩展 ID', run: (it) => copyId(it) },
   { sep: true },
   { label: '卸载', run: (it) => uninstall(it) },
