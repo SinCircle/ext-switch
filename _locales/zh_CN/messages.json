@@ -1,0 +1,8 @@
+{
+  "extensionName": {
+    "message": "扩展开关"
+  },
+  "extensionDescription": {
+    "message": "点一下工具栏图标，快速开关其他扩展。右键某一项还能打开它的详情页、选项页，或复制 ID、卸载。"
+  }
+}
